@@ -51,6 +51,21 @@ class RemoteNotifier extends StateNotifier<RemoteState> {
 
   void powerOff() => _svc.command('ssap://system/turnOff');
 
+  void openSettings() => _svc.command(
+        'ssap://system.launcher/open',
+        {'id': 'com.webos.app.settings'},
+      );
+
+  void insertText(String text) => _svc.command(
+        'ssap://com.webos.service.ime/insertText',
+        {'text': text, 'replace': false},
+      );
+
+  void deleteChar() => _svc.command(
+        'ssap://com.webos.service.ime/deleteCharacters',
+        {'count': 1},
+      );
+
   @override
   void dispose() {
     _sub.cancel();

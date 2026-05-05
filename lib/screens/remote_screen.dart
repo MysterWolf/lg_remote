@@ -7,7 +7,6 @@ import '../widgets/remote_button.dart';
 
 class RemoteScreen extends ConsumerStatefulWidget {
   final TvDevice tv;
-
   const RemoteScreen({super.key, required this.tv});
 
   @override
@@ -15,6 +14,8 @@ class RemoteScreen extends ConsumerStatefulWidget {
 }
 
 class _RemoteScreenState extends ConsumerState<RemoteScreen> {
+  bool _showKeyboard = false;
+
   @override
   void initState() {
     super.initState();
@@ -31,7 +32,7 @@ class _RemoteScreenState extends ConsumerState<RemoteScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final state = ref.watch(remoteProvider(widget.tv.ip));
+    final state  = ref.watch(remoteProvider(widget.tv.ip));
     final remote = ref.read(remoteProvider(widget.tv.ip).notifier);
 
     return Scaffold(
@@ -42,88 +43,160 @@ class _RemoteScreenState extends ConsumerState<RemoteScreen> {
           const SizedBox(width: 8),
         ],
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-        child: Column(
-          children: [
-            if (state.isPairing)
-              _PairingBanner(),
-            if (state.isError)
-              _ErrorBanner(onRetry: remote.connect),
+      body: Column(
+        children: [
+          _PersistentTopBar(
+            remote: remote,
+            enabled: state.isActive,
+            showKeyboard: _showKeyboard,
+            onToggleKeyboard: () =>
+                setState(() => _showKeyboard = !_showKeyboard),
+          ),
+          if (state.isPairing) _PairingBanner(),
+          if (state.isError) _ErrorBanner(onRetry: remote.connect),
+          Expanded(
+            child: _showKeyboard
+                ? _QwertyKeyboard(remote: remote, enabled: state.isActive)
+                : _RemoteSections(remote: remote, enabled: state.isActive),
+          ),
+        ],
+      ),
+    );
+  }
+}
 
-            // ── Power ──
-            Center(
-              child: RemoteButton(
-                color: const Color(0xFF8B0000),
-                size: 60,
-                onPressed: state.isActive ? remote.powerOff : null,
-                child: const Icon(Icons.power_settings_new,
-                    color: Colors.white, size: 28),
-              ),
+// ── Persistent top bar ────────────────────────────────
+
+class _PersistentTopBar extends StatelessWidget {
+  final RemoteNotifier remote;
+  final bool enabled;
+  final bool showKeyboard;
+  final VoidCallback onToggleKeyboard;
+
+  const _PersistentTopBar({
+    required this.remote,
+    required this.enabled,
+    required this.showKeyboard,
+    required this.onToggleKeyboard,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+      decoration: const BoxDecoration(
+        border: Border(bottom: BorderSide(color: Colors.white12)),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+        children: [
+          RemoteButton(
+            color: const Color(0xFF8B0000),
+            size: 54,
+            onPressed: enabled ? remote.powerOff : null,
+            child: const Icon(Icons.power_settings_new,
+                color: Colors.white, size: 26),
+          ),
+          RemoteButton(
+            color: const Color(0xFF2A2A4A),
+            size: 54,
+            onPressed: enabled ? remote.openSettings : null,
+            child: const Icon(Icons.settings, color: Colors.white70, size: 22),
+          ),
+          RemoteButton(
+            color: const Color(0xFF2A2A4A),
+            size: 54,
+            onPressed: onToggleKeyboard,
+            child: Icon(
+              showKeyboard ? Icons.tv_rounded : Icons.keyboard_alt_outlined,
+              color: showKeyboard ? Colors.lightBlueAccent : Colors.white70,
+              size: 22,
             ),
+          ),
+        ],
+      ),
+    );
+  }
+}
 
-            const SizedBox(height: 16),
-            const Divider(),
+// ── Collapsible remote sections ───────────────────────
 
-            // ── Volume / Mute / Channel ──
-            const _SectionLabel('Volume & Channel'),
-            _VolumeChannelGrid(remote: remote, enabled: state.isActive),
+class _RemoteSections extends StatelessWidget {
+  final RemoteNotifier remote;
+  final bool enabled;
 
-            const Divider(),
+  const _RemoteSections({required this.remote, required this.enabled});
 
-            // ── D-Pad ──
-            const _SectionLabel('Navigation'),
-            _DPad(remote: remote, enabled: state.isActive),
-            const SizedBox(height: 10),
-
-            // ── Back / Home ──
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
+  @override
+  Widget build(BuildContext context) {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      child: Column(
+        children: [
+          _CollapsibleSection(
+            title: 'Volume & Channel',
+            initiallyExpanded: false,
+            child: _VolumeChannelGrid(remote: remote, enabled: enabled),
+          ),
+          _CollapsibleSection(
+            title: 'Navigation',
+            initiallyExpanded: true,
+            child: Column(
               children: [
-                RemoteButton(
-                  width: 80,
-                  size: 44,
-                  borderRadius: BorderRadius.circular(10),
-                  color: const Color(0xFF2A2A4A),
-                  onPressed: state.isActive ? () => remote.key('BACK') : null,
-                  child: const Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(Icons.arrow_back, size: 16, color: Colors.white70),
-                      SizedBox(width: 4),
-                      Text('BACK'),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: 16),
-                RemoteButton(
-                  width: 80,
-                  size: 44,
-                  borderRadius: BorderRadius.circular(10),
-                  color: const Color(0xFF2A2A4A),
-                  onPressed: state.isActive ? () => remote.key('HOME') : null,
-                  child: const Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(Icons.home, size: 16, color: Colors.white70),
-                      SizedBox(width: 4),
-                      Text('HOME'),
-                    ],
-                  ),
+                _DPad(remote: remote, enabled: enabled),
+                const SizedBox(height: 10),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    RemoteButton(
+                      width: 80,
+                      size: 44,
+                      borderRadius: BorderRadius.circular(10),
+                      color: const Color(0xFF2A2A4A),
+                      onPressed:
+                          enabled ? () => remote.key('BACK') : null,
+                      child: const Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.arrow_back,
+                              size: 16, color: Colors.white70),
+                          SizedBox(width: 4),
+                          Text('BACK'),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    RemoteButton(
+                      width: 80,
+                      size: 44,
+                      borderRadius: BorderRadius.circular(10),
+                      color: const Color(0xFF2A2A4A),
+                      onPressed:
+                          enabled ? () => remote.key('HOME') : null,
+                      child: const Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.home, size: 16, color: Colors.white70),
+                          SizedBox(width: 4),
+                          Text('HOME'),
+                        ],
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),
-
-            const Divider(),
-
-            // ── Playback ──
-            const _SectionLabel('Playback'),
-            Row(
+          ),
+          _CollapsibleSection(
+            title: 'Playback',
+            initiallyExpanded: false,
+            child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 RemoteButton(
                   color: const Color(0xFF1A2A1A),
-                  onPressed: state.isActive ? () => remote.key('REWIND') : null,
+                  onPressed:
+                      enabled ? () => remote.key('REWIND') : null,
                   child: const Icon(Icons.fast_rewind,
                       color: Colors.white70, size: 22),
                 ),
@@ -131,14 +204,15 @@ class _RemoteScreenState extends ConsumerState<RemoteScreen> {
                 RemoteButton(
                   color: const Color(0xFF1A2A1A),
                   size: 58,
-                  onPressed: state.isActive ? () => remote.key('PLAY') : null,
+                  onPressed: enabled ? () => remote.key('PLAY') : null,
                   child: const Icon(Icons.play_arrow,
                       color: Colors.white, size: 28),
                 ),
                 const SizedBox(width: 12),
                 RemoteButton(
                   color: const Color(0xFF1A2A1A),
-                  onPressed: state.isActive ? () => remote.key('PAUSE') : null,
+                  onPressed:
+                      enabled ? () => remote.key('PAUSE') : null,
                   child: const Icon(Icons.pause,
                       color: Colors.white70, size: 22),
                 ),
@@ -146,27 +220,268 @@ class _RemoteScreenState extends ConsumerState<RemoteScreen> {
                 RemoteButton(
                   color: const Color(0xFF1A2A1A),
                   onPressed:
-                      state.isActive ? () => remote.key('FASTFORWARD') : null,
+                      enabled ? () => remote.key('FASTFORWARD') : null,
                   child: const Icon(Icons.fast_forward,
                       color: Colors.white70, size: 22),
                 ),
               ],
             ),
+          ),
+          _CollapsibleSection(
+            title: 'Keypad',
+            initiallyExpanded: false,
+            child: _NumberPad(remote: remote, enabled: enabled),
+          ),
+          const SizedBox(height: 16),
+        ],
+      ),
+    );
+  }
+}
 
-            const Divider(),
+// ── Collapsible section widget ────────────────────────
 
-            // ── Number Pad ──
-            const _SectionLabel('Keypad'),
-            _NumberPad(remote: remote, enabled: state.isActive),
-            const SizedBox(height: 16),
-          ],
+class _CollapsibleSection extends StatefulWidget {
+  final String title;
+  final bool initiallyExpanded;
+  final Widget child;
+
+  const _CollapsibleSection({
+    required this.title,
+    required this.child,
+    this.initiallyExpanded = false,
+  });
+
+  @override
+  State<_CollapsibleSection> createState() => _CollapsibleSectionState();
+}
+
+class _CollapsibleSectionState extends State<_CollapsibleSection>
+    with SingleTickerProviderStateMixin {
+  late bool _expanded;
+  late final AnimationController _ctrl;
+  late final Animation<double> _chevron;
+
+  @override
+  void initState() {
+    super.initState();
+    _expanded = widget.initiallyExpanded;
+    _ctrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 220),
+      value: _expanded ? 1.0 : 0.0,
+    );
+    _chevron = Tween<double>(begin: 0.0, end: 0.5).animate(
+      CurvedAnimation(parent: _ctrl, curve: Curves.easeInOut),
+    );
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  void _toggle() {
+    setState(() => _expanded = !_expanded);
+    _expanded ? _ctrl.forward() : _ctrl.reverse();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final labelColor = Theme.of(context)
+        .colorScheme
+        .onSurface
+        .withValues(alpha: 0.45);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        InkWell(
+          onTap: _toggle,
+          borderRadius: BorderRadius.circular(6),
+          child: Padding(
+            padding:
+                const EdgeInsets.symmetric(vertical: 10, horizontal: 4),
+            child: Row(
+              children: [
+                Text(
+                  widget.title.toUpperCase(),
+                  style: TextStyle(
+                    fontSize: 10,
+                    letterSpacing: 1.2,
+                    fontWeight: FontWeight.w600,
+                    color: labelColor,
+                  ),
+                ),
+                const Spacer(),
+                RotationTransition(
+                  turns: _chevron,
+                  child: Icon(Icons.expand_more, size: 18, color: labelColor),
+                ),
+              ],
+            ),
+          ),
+        ),
+        AnimatedSize(
+          duration: const Duration(milliseconds: 220),
+          curve: Curves.easeInOut,
+          child: _expanded
+              ? Padding(
+                  padding: const EdgeInsets.only(bottom: 14),
+                  child: widget.child,
+                )
+              : const SizedBox.shrink(),
+        ),
+        const Divider(height: 1),
+      ],
+    );
+  }
+}
+
+// ── QWERTY keyboard ───────────────────────────────────
+
+class _QwertyKeyboard extends StatelessWidget {
+  final RemoteNotifier remote;
+  final bool enabled;
+
+  const _QwertyKeyboard({required this.remote, required this.enabled});
+
+  static const _rows = [
+    ['Q', 'W', 'E', 'R', 'T', 'Y', 'U', 'I', 'O', 'P'],
+    ['A', 'S', 'D', 'F', 'G', 'H', 'J', 'K', 'L'],
+    ['Z', 'X', 'C', 'V', 'B', 'N', 'M'],
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 20),
+      child: Column(
+        children: [
+          ..._rows.map(
+            (row) => Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: row
+                    .map(
+                      (k) => Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 3),
+                        child: _KeyCap(
+                          label: k,
+                          onTap: enabled
+                              ? () => remote.insertText(k)
+                              : null,
+                        ),
+                      ),
+                    )
+                    .toList(),
+              ),
+            ),
+          ),
+          // Space + backspace
+          Padding(
+            padding: const EdgeInsets.only(top: 4),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                _WideKey(
+                  width: 190,
+                  label: 'SPACE',
+                  onTap: enabled ? () => remote.insertText(' ') : null,
+                ),
+                const SizedBox(width: 8),
+                _WideKey(
+                  width: 64,
+                  icon: Icons.backspace_outlined,
+                  color: const Color(0xFF2A1A1A),
+                  onTap: enabled ? remote.deleteChar : null,
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _KeyCap extends StatelessWidget {
+  final String label;
+  final VoidCallback? onTap;
+
+  const _KeyCap({required this.label, this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: const Color(0xFF1E1E3A),
+      borderRadius: BorderRadius.circular(7),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(7),
+        splashColor: Colors.white24,
+        child: Container(
+          width: 32,
+          height: 44,
+          alignment: Alignment.center,
+          child: Text(
+            label,
+            style: const TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+              color: Colors.white,
+            ),
+          ),
         ),
       ),
     );
   }
 }
 
-// ── Sub-widgets ──────────────────────────────────────
+class _WideKey extends StatelessWidget {
+  final double width;
+  final String? label;
+  final IconData? icon;
+  final Color color;
+  final VoidCallback? onTap;
+
+  const _WideKey({
+    required this.width,
+    this.label,
+    this.icon,
+    this.color = const Color(0xFF1E1E3A),
+    this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: color,
+      borderRadius: BorderRadius.circular(8),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(8),
+        splashColor: Colors.white24,
+        child: Container(
+          width: width,
+          height: 44,
+          alignment: Alignment.center,
+          child: label != null
+              ? Text(label!,
+                  style: const TextStyle(
+                      fontSize: 11,
+                      color: Colors.white60,
+                      letterSpacing: 1))
+              : Icon(icon, color: Colors.white70, size: 20),
+        ),
+      ),
+    );
+  }
+}
+
+// ── Unchanged sub-widgets ─────────────────────────────
 
 class _StatusChip extends StatelessWidget {
   final SsapStatus status;
@@ -175,12 +490,12 @@ class _StatusChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final (label, color) = switch (status) {
-      SsapStatus.ready => ('Ready', Colors.blue),
-      SsapStatus.connected => ('Connected', Colors.green),
-      SsapStatus.pairing => ('Pairing…', Colors.orange),
-      SsapStatus.connecting => ('Connecting…', Colors.amber),
-      SsapStatus.error => ('Error', Colors.red),
-      SsapStatus.disconnected => ('Offline', Colors.grey),
+      SsapStatus.ready        => ('Ready',        Colors.blue),
+      SsapStatus.connected    => ('Connected',    Colors.green),
+      SsapStatus.pairing      => ('Pairing…',     Colors.orange),
+      SsapStatus.connecting   => ('Connecting…',  Colors.amber),
+      SsapStatus.error        => ('Error',         Colors.red),
+      SsapStatus.disconnected => ('Offline',       Colors.grey),
     };
     return Chip(
       label: Text(label,
@@ -197,7 +512,7 @@ class _PairingBanner extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      margin: const EdgeInsets.only(bottom: 12),
+      margin: const EdgeInsets.fromLTRB(16, 8, 16, 0),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: Colors.orange.withValues(alpha: 0.15),
@@ -227,7 +542,7 @@ class _ErrorBanner extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      margin: const EdgeInsets.only(bottom: 12),
+      margin: const EdgeInsets.fromLTRB(16, 8, 16, 0),
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
         color: Colors.red.withValues(alpha: 0.15),
@@ -242,31 +557,8 @@ class _ErrorBanner extends StatelessWidget {
             child: Text('Connection failed',
                 style: TextStyle(color: Colors.red, fontSize: 13)),
           ),
-          TextButton(
-            onPressed: onRetry,
-            child: const Text('Retry'),
-          ),
+          TextButton(onPressed: onRetry, child: const Text('Retry')),
         ],
-      ),
-    );
-  }
-}
-
-class _SectionLabel extends StatelessWidget {
-  final String text;
-  const _SectionLabel(this.text);
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 6),
-      child: Text(
-        text.toUpperCase(),
-        style: TextStyle(
-          fontSize: 10,
-          letterSpacing: 1.2,
-          color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.4),
-        ),
       ),
     );
   }
@@ -280,16 +572,13 @@ class _VolumeChannelGrid extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     btn(Widget child, VoidCallback? fn, Color c) => RemoteButton(
-          color: c,
-          onPressed: enabled ? fn : null,
-          child: child,
-        );
+          color: c, onPressed: enabled ? fn : null, child: child);
 
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
         Column(children: [
-          btn(const Text('VOL+'), remote.volumeUp, const Color(0xFF0D2A5C)),
+          btn(const Text('VOL+'), remote.volumeUp,   const Color(0xFF0D2A5C)),
           const SizedBox(height: 8),
           btn(const Text('VOL-'), remote.volumeDown, const Color(0xFF0D2A5C)),
         ]),
@@ -301,7 +590,7 @@ class _VolumeChannelGrid extends StatelessWidget {
         ),
         const SizedBox(width: 16),
         Column(children: [
-          btn(const Text('CH+'), remote.channelUp, const Color(0xFF0D3D1A)),
+          btn(const Text('CH+'), remote.channelUp,   const Color(0xFF0D3D1A)),
           const SizedBox(height: 8),
           btn(const Text('CH-'), remote.channelDown, const Color(0xFF0D3D1A)),
         ]),
@@ -320,43 +609,40 @@ class _DPad extends StatelessWidget {
     btn(Widget child, String key, [Color? color]) => RemoteButton(
           color: color ?? const Color(0xFF1E1E3A),
           onPressed: enabled ? () => remote.key(key) : null,
-          child: child,
-        );
+          child: child);
 
-    const gap = SizedBox(width: 8, height: 8);
+    const gap   = SizedBox(width: 8, height: 8);
     const blank = SizedBox(width: 52, height: 52);
 
-    return Column(
-      children: [
-        Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-          blank,
-          gap,
-          btn(const Icon(Icons.keyboard_arrow_up, size: 28), 'UP'),
-          gap,
-          blank,
-        ]),
-        const SizedBox(height: 8),
-        Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-          btn(const Icon(Icons.keyboard_arrow_left, size: 28), 'LEFT'),
-          gap,
-          btn(const Text('OK',
+    return Column(children: [
+      Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+        blank, gap,
+        btn(const Icon(Icons.keyboard_arrow_up, size: 28), 'UP'),
+        gap, blank,
+      ]),
+      const SizedBox(height: 8),
+      Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+        btn(const Icon(Icons.keyboard_arrow_left,  size: 28), 'LEFT'),
+        gap,
+        btn(
+          const Text('OK',
               style: TextStyle(
-                  fontSize: 14, fontWeight: FontWeight.bold, color: Colors.white)),
-              'ENTER',
-              const Color(0xFF4A148C)),
-          gap,
-          btn(const Icon(Icons.keyboard_arrow_right, size: 28), 'RIGHT'),
-        ]),
-        const SizedBox(height: 8),
-        Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-          blank,
-          gap,
-          btn(const Icon(Icons.keyboard_arrow_down, size: 28), 'DOWN'),
-          gap,
-          blank,
-        ]),
-      ],
-    );
+                  fontSize: 14,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white)),
+          'ENTER',
+          const Color(0xFF4A148C),
+        ),
+        gap,
+        btn(const Icon(Icons.keyboard_arrow_right, size: 28), 'RIGHT'),
+      ]),
+      const SizedBox(height: 8),
+      Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+        blank, gap,
+        btn(const Icon(Icons.keyboard_arrow_down, size: 28), 'DOWN'),
+        gap, blank,
+      ]),
+    ]);
   }
 }
 
@@ -374,32 +660,23 @@ class _NumberPad extends StatelessWidget {
               style: const TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.w500,
-                  color: Colors.white70)),
-        );
+                  color: Colors.white70)));
 
     const gap = SizedBox(width: 10, height: 10);
 
-    return Column(
-      children: [
-        for (final row in [
-          ['1', '2', '3'],
-          ['4', '5', '6'],
-          ['7', '8', '9'],
-        ]) ...[
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              btn(row[0]),
-              gap,
-              btn(row[1]),
-              gap,
-              btn(row[2]),
-            ],
-          ),
-          gap,
-        ],
-        btn('0'),
+    return Column(children: [
+      for (final row in [
+        ['1', '2', '3'],
+        ['4', '5', '6'],
+        ['7', '8', '9'],
+      ]) ...[
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [btn(row[0]), gap, btn(row[1]), gap, btn(row[2])],
+        ),
+        gap,
       ],
-    );
+      btn('0'),
+    ]);
   }
 }
