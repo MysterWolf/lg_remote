@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/tv_device.dart';
 import '../services/ssap_service.dart';
@@ -51,10 +52,22 @@ class RemoteNotifier extends StateNotifier<RemoteState> {
 
   void powerOff() => _svc.command('ssap://system/turnOff');
 
-  void openSettings() => _svc.command(
+  void openSettings(String appId) => _svc.command(
         'ssap://system.launcher/open',
-        {'id': 'com.webos.app.settings'},
+        {'id': appId},
       );
+
+  Future<List<Map<String, dynamic>>> listApps() async {
+    final result = await _svc.request(
+        'ssap://com.webos.applicationManager/listApps');
+    final raw = result['apps'] as List<dynamic>? ?? [];
+    final apps = raw.cast<Map<String, dynamic>>();
+    debugPrint('[LG] listApps — ${apps.length} total apps:');
+    for (final app in apps) {
+      debugPrint('  id="${app['id']}"  title="${app['title']}"');
+    }
+    return apps;
+  }
 
   void insertText(String text) => _svc.command(
         'ssap://com.webos.service.ime/insertText',

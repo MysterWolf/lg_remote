@@ -16,6 +16,80 @@ class RemoteScreen extends ConsumerStatefulWidget {
 class _RemoteScreenState extends ConsumerState<RemoteScreen> {
   bool _showKeyboard = false;
 
+  Future<void> _handleSettings(
+      BuildContext context, RemoteNotifier remote) async {
+    // Show loading indicator while querying
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => const Center(child: CircularProgressIndicator()),
+    );
+
+    List<Map<String, dynamic>> apps;
+    try {
+      apps = await remote.listApps();
+    } catch (e) {
+      if (!context.mounted) return;
+      Navigator.of(context).pop(); // dismiss loading
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('listApps failed: $e')),
+      );
+      return;
+    }
+
+    if (!context.mounted) return;
+    Navigator.of(context).pop(); // dismiss loading
+
+    // Filter to settings-related apps
+    final settingsApps = apps.where((a) {
+      final id    = (a['id']    as String? ?? '').toLowerCase();
+      final title = (a['title'] as String? ?? '').toLowerCase();
+      return id.contains('setting') || title.contains('setting');
+    }).toList();
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      builder: (_) => DraggableScrollableSheet(
+        expand: false,
+        initialChildSize: 0.5,
+        builder: (_, scrollCtrl) => ListView(
+          controller: scrollCtrl,
+          padding: const EdgeInsets.all(16),
+          children: [
+            const Text('Settings-related apps found:',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+            const SizedBox(height: 8),
+            if (settingsApps.isEmpty)
+              const Text('None found — check logcat for full list.',
+                  style: TextStyle(color: Colors.red))
+            else
+              for (final app in settingsApps)
+                ListTile(
+                  dense: true,
+                  title: Text(app['title'] as String? ?? ''),
+                  subtitle: Text(app['id'] as String? ?? '',
+                      style: const TextStyle(
+                          fontFamily: 'monospace', fontSize: 11)),
+                  trailing: TextButton(
+                    child: const Text('LAUNCH'),
+                    onPressed: () {
+                      Navigator.of(context).pop();
+                      remote.openSettings(app['id'] as String);
+                    },
+                  ),
+                ),
+            const Divider(),
+            const Text(
+              'Full app list printed to debug log (flutter logs / logcat).',
+              style: TextStyle(fontSize: 11, color: Colors.grey),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   void initState() {
     super.initState();
@@ -51,6 +125,7 @@ class _RemoteScreenState extends ConsumerState<RemoteScreen> {
             showKeyboard: _showKeyboard,
             onToggleKeyboard: () =>
                 setState(() => _showKeyboard = !_showKeyboard),
+            onSettings: () => _handleSettings(context, remote),
           ),
           if (state.isPairing) _PairingBanner(),
           if (state.isError) _ErrorBanner(onRetry: remote.connect),
@@ -72,12 +147,14 @@ class _PersistentTopBar extends StatelessWidget {
   final bool enabled;
   final bool showKeyboard;
   final VoidCallback onToggleKeyboard;
+  final VoidCallback onSettings;
 
   const _PersistentTopBar({
     required this.remote,
     required this.enabled,
     required this.showKeyboard,
     required this.onToggleKeyboard,
+    required this.onSettings,
   });
 
   @override
@@ -100,7 +177,7 @@ class _PersistentTopBar extends StatelessWidget {
           RemoteButton(
             color: const Color(0xFF2A2A4A),
             size: 54,
-            onPressed: enabled ? remote.openSettings : null,
+            onPressed: enabled ? onSettings : null,
             child: const Icon(Icons.settings, color: Colors.white70, size: 22),
           ),
           RemoteButton(
