@@ -18,76 +18,32 @@ class _RemoteScreenState extends ConsumerState<RemoteScreen> {
 
   Future<void> _handleSettings(
       BuildContext context, RemoteNotifier remote) async {
-    // Show loading indicator while querying
     showDialog(
       context: context,
       barrierDismissible: false,
       builder: (_) => const Center(child: CircularProgressIndicator()),
     );
 
-    List<Map<String, dynamic>> apps;
+    bool found;
     try {
-      apps = await remote.listApps();
+      found = await remote.launchSettings();
     } catch (e) {
       if (!context.mounted) return;
-      Navigator.of(context).pop(); // dismiss loading
+      Navigator.of(context).pop();
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('listApps failed: $e')),
+        SnackBar(content: Text('Could not query app list: $e')),
       );
       return;
     }
 
     if (!context.mounted) return;
-    Navigator.of(context).pop(); // dismiss loading
+    Navigator.of(context).pop();
 
-    // Filter to settings-related apps
-    final settingsApps = apps.where((a) {
-      final id    = (a['id']    as String? ?? '').toLowerCase();
-      final title = (a['title'] as String? ?? '').toLowerCase();
-      return id.contains('setting') || title.contains('setting');
-    }).toList();
-
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      builder: (_) => DraggableScrollableSheet(
-        expand: false,
-        initialChildSize: 0.5,
-        builder: (_, scrollCtrl) => ListView(
-          controller: scrollCtrl,
-          padding: const EdgeInsets.all(16),
-          children: [
-            const Text('Settings-related apps found:',
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-            const SizedBox(height: 8),
-            if (settingsApps.isEmpty)
-              const Text('None found — check logcat for full list.',
-                  style: TextStyle(color: Colors.red))
-            else
-              for (final app in settingsApps)
-                ListTile(
-                  dense: true,
-                  title: Text(app['title'] as String? ?? ''),
-                  subtitle: Text(app['id'] as String? ?? '',
-                      style: const TextStyle(
-                          fontFamily: 'monospace', fontSize: 11)),
-                  trailing: TextButton(
-                    child: const Text('LAUNCH'),
-                    onPressed: () {
-                      Navigator.of(context).pop();
-                      remote.openSettings(app['id'] as String);
-                    },
-                  ),
-                ),
-            const Divider(),
-            const Text(
-              'Full app list printed to debug log (flutter logs / logcat).',
-              style: TextStyle(fontSize: 11, color: Colors.grey),
-            ),
-          ],
-        ),
-      ),
-    );
+    if (!found) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Settings app not found on this TV')),
+      );
+    }
   }
 
   @override

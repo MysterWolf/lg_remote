@@ -69,6 +69,34 @@ class RemoteNotifier extends StateNotifier<RemoteState> {
     return apps;
   }
 
+  /// Queries the app list at runtime, finds the best settings app, and
+  /// launches it. Returns false if no settings app is found.
+  Future<bool> launchSettings() async {
+    final apps = await listApps();
+
+    final candidates = apps
+        .where((a) =>
+            (a['id'] as String? ?? '').toLowerCase().contains('settings'))
+        .toList();
+
+    if (candidates.isEmpty) return false;
+
+    // Score by closeness to the canonical WebOS settings ID
+    const target = 'com.webos.app.settings';
+    int score(Map<String, dynamic> app) {
+      final id = (app['id'] as String? ?? '').toLowerCase();
+      if (id == target) return 3;
+      if (id.endsWith('.settings')) return 2;
+      return 1;
+    }
+
+    candidates.sort((a, b) => score(b).compareTo(score(a)));
+    final bestId = candidates.first['id'] as String;
+    debugPrint('[LG] launchSettings → $bestId');
+    openSettings(bestId);
+    return true;
+  }
+
   void insertText(String text) => _svc.command(
         'ssap://com.webos.service.ime/insertText',
         {'text': text, 'replace': false},
