@@ -4,7 +4,9 @@ import 'package:lg_remote/main.dart';
 
 void main() {
   testWidgets('App launches smoke test', (WidgetTester tester) async {
-    await tester.pumpWidget(const ProviderScope(child: LgRemoteApp()));
+    await tester.pumpWidget(
+      const ProviderScope(child: LgRemoteApp(initialSavedTvs: [])),
+    );
     expect(find.text('LG Remote'), findsOneWidget);
   });
 }

@@ -7,7 +7,12 @@ import '../widgets/remote_button.dart';
 
 class RemoteScreen extends ConsumerStatefulWidget {
   final TvDevice tv;
-  const RemoteScreen({super.key, required this.tv});
+
+  /// Non-null when launched via the single-TV fast path. Replaces the
+  /// default back button with a labelled "Switch TV" action.
+  final VoidCallback? onSwitchTv;
+
+  const RemoteScreen({super.key, required this.tv, this.onSwitchTv});
 
   @override
   ConsumerState<RemoteScreen> createState() => _RemoteScreenState();
@@ -67,8 +72,14 @@ class _RemoteScreenState extends ConsumerState<RemoteScreen> {
 
     return Scaffold(
       appBar: AppBar(
+        automaticallyImplyLeading: widget.onSwitchTv == null,
         title: Text(widget.tv.name),
         actions: [
+          if (widget.onSwitchTv != null)
+            TextButton(
+              onPressed: widget.onSwitchTv,
+              child: const Text('Switch TV'),
+            ),
           _StatusChip(status: state.status),
           const SizedBox(width: 8),
         ],
