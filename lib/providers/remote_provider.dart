@@ -17,18 +17,75 @@ class RemoteState {
   bool get isPairing => status == SsapStatus.pairing;
   bool get isConnecting => status == SsapStatus.connecting;
   bool get isError => status == SsapStatus.error;
+
+  TvConnectionState get connectionState =>
+      SsapService.toConnectionState(status);
 }
 
 class RemoteNotifier extends StateNotifier<RemoteState> {
   final SsapService _svc;
   late final StreamSubscription<SsapStatus> _sub;
 
+  // ── Reconnect guard flags ─────────────────────────────
+  // Prevents auto-reconnect when the socket close was deliberate.
+  bool _intentionalDisconnect = false;
+  // True while reconnect() is mid-flight (disconnect→delay→connect).
+  // Blocks auto-reconnect from firing on the intermediate disconnect event.
+  bool _reconnecting = false;
+  // Ensures only one automatic reconnect attempt per unexpected drop.
+  bool _didAutoReconnect = false;
+  Timer? _reconnectTimer;
+
   RemoteNotifier(this._svc) : super(const RemoteState()) {
-    _sub = _svc.statusStream.listen((s) => state = RemoteState(status: s));
+    _sub = _svc.statusStream.listen(_onStatus);
+  }
+
+  void _onStatus(SsapStatus s) {
+    if (!mounted) return;
+    state = RemoteState(status: s);
+
+    if (s == SsapStatus.connected || s == SsapStatus.ready) {
+      // Successful connection resets the one-shot auto-reconnect gate.
+      _didAutoReconnect = false;
+    }
+
+    if (s == SsapStatus.disconnected || s == SsapStatus.error) {
+      if (!_intentionalDisconnect && !_reconnecting && !_didAutoReconnect) {
+        _reconnectTimer?.cancel();
+        _reconnectTimer = Timer(const Duration(seconds: 2), () {
+          if (!mounted) return;
+          _didAutoReconnect = true;
+          _svc.connect();
+        });
+      }
+      // Only clear the flag once we've fully landed in a terminal state,
+      // and not while a reconnect() call is managing the lifecycle itself.
+      if (!_reconnecting) _intentionalDisconnect = false;
+    }
   }
 
   Future<void> connect() => _svc.connect();
-  void disconnect() => _svc.disconnect();
+
+  void disconnect() {
+    _reconnectTimer?.cancel();
+    _intentionalDisconnect = true;
+    _svc.disconnect();
+  }
+
+  /// Closes the existing socket cleanly, waits 500 ms, then re-initiates
+  /// the full connection and pairing flow. Safe to call in any state.
+  Future<void> reconnect() async {
+    _reconnectTimer?.cancel();
+    _reconnecting = true;
+    _didAutoReconnect = false;
+    _intentionalDisconnect = true;
+    _svc.disconnect(); // emits disconnected synchronously; _onStatus ignores it
+    await Future.delayed(const Duration(milliseconds: 500));
+    if (!mounted) return;
+    _reconnecting = false;
+    _intentionalDisconnect = false;
+    await _svc.connect();
+  }
 
   // Navigation — always via pointer socket
   void key(String name) => _svc.pressKey(name);
@@ -50,7 +107,12 @@ class RemoteNotifier extends StateNotifier<RemoteState> {
       ? _svc.pressKey('CHANNELDOWN')
       : _svc.command('ssap://tv/channelDown');
 
-  void powerOff() => _svc.command('ssap://system/turnOff');
+  void powerOff() {
+    // TV will close the WebSocket after processing this; mark it intentional
+    // so the resulting disconnect does not trigger auto-reconnect.
+    _intentionalDisconnect = true;
+    _svc.command('ssap://system/turnOff');
+  }
 
   void openSettings(String appId) => _svc.command(
         'ssap://system.launcher/open',
@@ -109,6 +171,7 @@ class RemoteNotifier extends StateNotifier<RemoteState> {
 
   @override
   void dispose() {
+    _reconnectTimer?.cancel();
     _sub.cancel();
     _svc.dispose();
     super.dispose();

@@ -7,6 +7,9 @@ import 'package:web_socket_channel/web_socket_channel.dart';
 
 enum SsapStatus { disconnected, connecting, pairing, connected, ready, error }
 
+/// Simplified 3-state connection view used by the UI dot and reconnect button.
+enum TvConnectionState { disconnected, connecting, connected }
+
 class SsapService {
   final String ip;
 
@@ -22,6 +25,19 @@ class SsapService {
 
   SsapStatus _status = SsapStatus.disconnected;
   SsapStatus get status => _status;
+
+  static TvConnectionState toConnectionState(SsapStatus s) => switch (s) {
+        SsapStatus.connected || SsapStatus.ready => TvConnectionState.connected,
+        SsapStatus.connecting ||
+        SsapStatus.pairing =>
+          TvConnectionState.connecting,
+        _ => TvConnectionState.disconnected,
+      };
+
+  TvConnectionState get connectionState => toConnectionState(_status);
+
+  Stream<TvConnectionState> get connectionStateStream =>
+      statusStream.map(toConnectionState);
 
   String? _clientKey;
 

@@ -89,10 +89,12 @@ class _RemoteScreenState extends ConsumerState<RemoteScreen> {
           _PersistentTopBar(
             remote: remote,
             enabled: state.isActive,
+            connectionState: state.connectionState,
             showKeyboard: _showKeyboard,
             onToggleKeyboard: () =>
                 setState(() => _showKeyboard = !_showKeyboard),
             onSettings: () => _handleSettings(context, remote),
+            onReconnect: remote.reconnect,
           ),
           if (state.isPairing) _PairingBanner(),
           if (state.isError) _ErrorBanner(onRetry: remote.connect),
@@ -112,16 +114,20 @@ class _RemoteScreenState extends ConsumerState<RemoteScreen> {
 class _PersistentTopBar extends StatelessWidget {
   final RemoteNotifier remote;
   final bool enabled;
+  final TvConnectionState connectionState;
   final bool showKeyboard;
   final VoidCallback onToggleKeyboard;
   final VoidCallback onSettings;
+  final VoidCallback onReconnect;
 
   const _PersistentTopBar({
     required this.remote,
     required this.enabled,
+    required this.connectionState,
     required this.showKeyboard,
     required this.onToggleKeyboard,
     required this.onSettings,
+    required this.onReconnect,
   });
 
   @override
@@ -134,6 +140,7 @@ class _PersistentTopBar extends StatelessWidget {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
         children: [
+          _StatusDot(connectionState: connectionState, onReconnect: onReconnect),
           RemoteButton(
             color: const Color(0xFF8B0000),
             size: 54,
@@ -156,6 +163,63 @@ class _PersistentTopBar extends StatelessWidget {
               color: showKeyboard ? Colors.lightBlueAccent : Colors.white70,
               size: 22,
             ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ── Status dot / reconnect button ─────────────────────
+
+class _StatusDot extends StatelessWidget {
+  final TvConnectionState connectionState;
+  final VoidCallback onReconnect;
+
+  const _StatusDot({required this.connectionState, required this.onReconnect});
+
+  @override
+  Widget build(BuildContext context) {
+    final color = switch (connectionState) {
+      TvConnectionState.connected   => Colors.greenAccent,
+      TvConnectionState.connecting  => Colors.amber,
+      TvConnectionState.disconnected => Colors.redAccent,
+    };
+
+    final dot = Container(
+      width: 12,
+      height: 12,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: color,
+        boxShadow: [
+          BoxShadow(color: color.withValues(alpha: 0.55), blurRadius: 6),
+        ],
+      ),
+    );
+
+    // When connected: just the dot (no action needed).
+    if (connectionState == TvConnectionState.connected) {
+      return SizedBox(width: 54, height: 54, child: Center(child: dot));
+    }
+
+    // When connecting or disconnected: refresh button with a dot badge.
+    return SizedBox(
+      width: 54,
+      height: 54,
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          RemoteButton(
+            size: 54,
+            color: const Color(0xFF2A2A4A),
+            onPressed: onReconnect,
+            child: const Icon(Icons.refresh, color: Colors.white70, size: 22),
+          ),
+          Positioned(
+            right: 1,
+            top: 1,
+            child: dot,
           ),
         ],
       ),
