@@ -3,7 +3,7 @@
     <uses-permission android:name="android.permission.CHANGE_WIFI_MULTICAST_STATE"/>
 
     <application
-        android:label="LG Remote"
+        android:label="DPad Pilot"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <activity
