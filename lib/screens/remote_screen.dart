@@ -4,6 +4,7 @@ import '../models/tv_device.dart';
 import '../providers/remote_provider.dart';
 import '../services/ssap_service.dart';
 import '../widgets/remote_button.dart';
+import 'about_screen.dart';
 
 class RemoteScreen extends ConsumerStatefulWidget {
   final TvDevice tv;
@@ -80,6 +81,13 @@ class _RemoteScreenState extends ConsumerState<RemoteScreen> {
               onPressed: widget.onSwitchTv,
               child: const Text('Switch TV'),
             ),
+          IconButton(
+            icon: const Icon(Icons.info_outline),
+            tooltip: 'About',
+            onPressed: () => Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const AboutScreen()),
+            ),
+          ),
           _StatusChip(status: state.status),
           const SizedBox(width: 8),
         ],

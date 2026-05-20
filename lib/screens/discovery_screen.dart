@@ -173,7 +173,7 @@ class _DiscoveryScreenState extends ConsumerState<DiscoveryScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('LG Remote'),
+        title: const Text('DPad Pilot'),
         actions: [
           if (scanning)
             const Padding(
