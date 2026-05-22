@@ -1,6 +1,6 @@
 name: dpad_pilot
 description: LG WebOS TV remote control over local WiFi
-version: 2.0.0+2
+version: 2.1.0+3
 
 environment:
   sdk: '>=3.3.0 <4.0.0'

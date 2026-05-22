@@ -26,6 +26,8 @@ class RemoteNotifier extends StateNotifier<RemoteState> {
   final SsapService _svc;
   late final StreamSubscription<SsapStatus> _sub;
 
+  List<Map<String, dynamic>>? _cachedApps;
+
   // ── Reconnect guard flags ─────────────────────────────
   // Prevents auto-reconnect when the socket close was deliberate.
   bool _intentionalDisconnect = false;
@@ -119,16 +121,36 @@ class RemoteNotifier extends StateNotifier<RemoteState> {
         {'id': appId},
       );
 
+  void launchApp(String appId) => _svc.command(
+        'ssap://system.launcher/launch',
+        {'id': appId},
+      );
+
+  /// Searches the cached app list for the first app whose ID contains any of
+  /// [terms], then launches it. Returns false when no match is found.
+  Future<bool> launchStreamingApp(List<String> terms) async {
+    final apps = await listApps();
+    for (final app in apps) {
+      final id = (app['id'] as String? ?? '').toLowerCase();
+      if (terms.any((t) => id.contains(t))) {
+        launchApp(app['id'] as String);
+        return true;
+      }
+    }
+    return false;
+  }
+
   Future<List<Map<String, dynamic>>> listApps() async {
+    if (_cachedApps != null) return _cachedApps!;
     final result = await _svc.request(
         'ssap://com.webos.applicationManager/listApps');
     final raw = result['apps'] as List<dynamic>? ?? [];
-    final apps = raw.cast<Map<String, dynamic>>();
-    debugPrint('[LG] listApps — ${apps.length} total apps:');
-    for (final app in apps) {
+    _cachedApps = raw.cast<Map<String, dynamic>>();
+    debugPrint('[LG] listApps — ${_cachedApps!.length} total apps:');
+    for (final app in _cachedApps!) {
       debugPrint('  id="${app['id']}"  title="${app['title']}"');
     }
-    return apps;
+    return _cachedApps!;
   }
 
   /// Queries the app list at runtime, finds the best settings app, and
