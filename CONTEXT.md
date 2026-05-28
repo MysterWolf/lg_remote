@@ -43,7 +43,7 @@ All persistence under `saved_tvs` key in SharedPreferences. Methods: `load`, `ad
 Plain `StateNotifier<DiscoveryState>`. `scan()` wraps `SsdpService.discover()`. `ScanStatus` enum: `idle / scanning / done / error`.
 
 ### `lib/providers/saved_tvs_provider.dart`
-`SavedTvsNotifier` wrapping the service. Accepts `initial:` list for zero-flash startup (loaded before `runApp`). Methods: `add`, `remove`, `rename`, `updateLastSeen`, `isSaved(ip)`, `find(ip)`.
+`SavedTvsNotifier` wrapping the service. Starts empty; `SplashScreen` calls `init(tvs)` after loading to populate before navigation. Methods: `init`, `add`, `remove`, `rename`, `updateLastSeen`, `isSaved(ip)`, `find(ip)`.
 
 ### `lib/providers/remote_provider.dart`
 `StateNotifierProvider.family` keyed by IP — each TV gets isolated state.
@@ -74,6 +74,11 @@ Plain `StateNotifier<DiscoveryState>`. `scan()` wraps `SsdpService.discover()`. 
 
 ## Screens
 
+### `lib/screens/splash_screen.dart`
+First screen shown on launch. `ConsumerStatefulWidget` — runs `Future.wait([Future.delayed(3s), _loadTvs()])` in `initState`, then calls `savedTvsProvider.notifier.init(tvs)` and navigates via `pushReplacement`. Routing logic: single saved TV → `RemoteScreen` with `onSwitchTv`; otherwise → `DiscoveryScreen`. UI: MWS mark (`assets/mws_mark_dark.png`, 120×120), "mysterwolf" (serif), "studios" (mono), tagline — all centered on `#1e1e2e`.
+
+Native white flash eliminated: `drawable/launch_background.xml` and `drawable-v21/launch_background.xml` both use `@color/ic_launcher_background` (`#1e1e2e`); both `values/styles.xml` and `values-night/styles.xml` use `Theme.Black.NoTitleBar` with `#1e1e2e` for both `LaunchTheme` and `NormalTheme`.
+
 ### `lib/screens/discovery_screen.dart`
 - Saved TVs section at top (deduped — SSDP results filter out any IP already saved)
 - SSDP scan results below; bookmark icon to save with custom name
@@ -103,7 +108,7 @@ No `bottomNavigationBar` — the Scaffold body fills to the bottom edge. `_Remot
 **`_QwertyKeyboard`** — swaps entire body, sends via `insertText`, backspace via `deleteChar`
 
 ### `lib/screens/about_screen.dart`
-App icon, tagline, version via `package_info_plus`, MysterWolf Development credit, Ko-fi link via `url_launcher`.
+App icon, tagline, version via `package_info_plus`, MysterWolf Development credit, MWS mark (`assets/mws_mark_dark.png`, height 36) below the credit, Ko-fi link via `url_launcher`.
 
 ---
 
@@ -116,9 +121,9 @@ App icon, tagline, version via `package_info_plus`, MysterWolf Development credi
 
 ## App Behavior
 
-- **Single saved TV** → skips discovery, connects directly to `RemoteScreen` with `onSwitchTv` callback
-- **Multiple saved TVs** → lands on `DiscoveryScreen`
-- **Zero saved TVs** → lands on `DiscoveryScreen`
+- **Always** → `SplashScreen` first (min 3s), then routes based on saved TV count
+- **Single saved TV** → `RemoteScreen` with `onSwitchTv` callback
+- **Multiple / zero saved TVs** → `DiscoveryScreen`
 - App icon: `assets/DPad-Pilot.png`, adaptive icon with `#1e1e2e` background
 - App display name: DPad Pilot | Package: `dpad_pilot`
 - Theme: dark Catppuccin (`scaffold: 0xFF0F0F1A`, `surface: 0xFF1E1E2E`, `onSurface: 0xFFCDD6F4`, seed: `0xFF7B82FF`)
