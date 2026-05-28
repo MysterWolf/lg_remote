@@ -32,3 +32,4 @@ flutter:
   uses-material-design: true
   assets:
     - assets/DPad-Pilot.png
+    - assets/mws_mark_dark.png

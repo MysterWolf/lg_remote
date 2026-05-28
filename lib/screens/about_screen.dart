@@ -84,6 +84,11 @@ class _AboutScreenState extends State<AboutScreen> {
                   color: cs.onSurface.withValues(alpha: 0.4),
                 ),
               ),
+              const SizedBox(height: 12),
+              Image.asset(
+                'assets/mws_mark_dark.png',
+                height: 36,
+              ),
               const Spacer(flex: 3),
               FilledButton.icon(
                 onPressed: _openKoFi,

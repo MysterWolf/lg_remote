@@ -24,6 +24,8 @@ class SavedTvsNotifier extends StateNotifier<List<SavedTv>> {
     state = await _svc.updateLastSeen(state, ip);
   }
 
+  void init(List<SavedTv> tvs) => state = tvs;
+
   bool isSaved(String ip) => state.any((t) => t.ip == ip);
 
   SavedTv? find(String ip) {
