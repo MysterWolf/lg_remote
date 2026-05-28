@@ -72,6 +72,13 @@ Plain `StateNotifier<DiscoveryState>`. `scan()` wraps `SsdpService.discover()`. 
 
 ---
 
+## Entry Point
+
+### `lib/main.dart`
+`main()` calls `WidgetsFlutterBinding.ensureInitialized()`, locks portrait, then immediately calls `runApp(ProviderScope(child: LgRemoteApp()))` — no pre-loading, no routing logic. `LgRemoteApp` is a plain `StatelessWidget` that builds `MaterialApp` with `SplashScreen` as `home`. All startup routing lives in `SplashScreen`.
+
+---
+
 ## Screens
 
 ### `lib/screens/splash_screen.dart`
