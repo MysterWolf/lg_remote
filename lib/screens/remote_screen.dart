@@ -92,10 +92,6 @@ class _RemoteScreenState extends ConsumerState<RemoteScreen> {
           const SizedBox(width: 8),
         ],
       ),
-      bottomNavigationBar: _AppLauncherBar(
-        remote: remote,
-        enabled: state.isActive,
-      ),
       body: Column(
         children: [
           _PersistentTopBar(
@@ -249,8 +245,23 @@ class _RemoteSections extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    Future<void> launch(List<String> terms, String appName) async {
+      bool found;
+      try {
+        found = await remote.launchStreamingApp(terms);
+      } catch (_) {
+        found = false;
+      }
+      if (!found && context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('$appName not found on this TV')),
+        );
+      }
+    }
+
+    final bottomPad = MediaQuery.of(context).padding.bottom;
     return SingleChildScrollView(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      padding: EdgeInsets.fromLTRB(16, 8, 16, 16 + bottomPad),
       child: Column(
         children: [
           _CollapsibleSection(
@@ -351,6 +362,45 @@ class _RemoteSections extends StatelessWidget {
             title: 'Keypad',
             initiallyExpanded: false,
             child: _NumberPad(remote: remote, enabled: enabled),
+          ),
+          _CollapsibleSection(
+            title: 'Apps',
+            initiallyExpanded: false,
+            child: Row(
+              children: [
+                Expanded(
+                  child: _AppButton(
+                    label: 'Disney+',
+                    enabled: enabled,
+                    onTap: () => launch(['disney'], 'Disney+'),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: _AppButton(
+                    label: 'YouTube',
+                    enabled: enabled,
+                    onTap: () => launch(['youtube'], 'YouTube'),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: _AppButton(
+                    label: 'Amazon Prime',
+                    enabled: enabled,
+                    onTap: () => launch(['amazon', 'prime'], 'Amazon Prime'),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: _AppButton(
+                    label: 'Netflix',
+                    enabled: enabled,
+                    onTap: () => launch(['netflix'], 'Netflix'),
+                  ),
+                ),
+              ],
+            ),
           ),
           const SizedBox(height: 16),
         ],
@@ -798,77 +848,6 @@ class _NumberPad extends StatelessWidget {
       ],
       btn('0'),
     ]);
-  }
-}
-
-// ── App launcher bar ──────────────────────────────────
-
-class _AppLauncherBar extends StatelessWidget {
-  final RemoteNotifier remote;
-  final bool enabled;
-
-  const _AppLauncherBar({required this.remote, required this.enabled});
-
-  Future<void> _launch(
-    BuildContext context,
-    List<String> terms,
-    String appName,
-  ) async {
-    bool found;
-    try {
-      found = await remote.launchStreamingApp(terms);
-    } catch (_) {
-      found = false;
-    }
-    if (!found && context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('$appName not found on this TV')),
-      );
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      decoration: const BoxDecoration(
-        color: Color(0xFF252538),
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-        border: Border(top: BorderSide(color: Colors.white12)),
-      ),
-      child: SafeArea(
-        top: false,
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(12, 12, 12, 8),
-          child: Row(
-            children: [
-              Expanded(
-                child: _AppButton(
-                  label: 'Disney+',
-                  enabled: enabled,
-                  onTap: () => _launch(context, ['disney'], 'Disney+'),
-                ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: _AppButton(
-                  label: 'YouTube',
-                  enabled: enabled,
-                  onTap: () => _launch(context, ['youtube'], 'YouTube'),
-                ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: _AppButton(
-                  label: 'Amazon Prime',
-                  enabled: enabled,
-                  onTap: () => _launch(context, ['amazon', 'prime'], 'Amazon Prime'),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
   }
 }
 

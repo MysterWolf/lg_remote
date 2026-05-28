@@ -91,19 +91,14 @@ Plain `StateNotifier<DiscoveryState>`. `scan()` wraps `SsdpService.discover()`. 
 3. `_ErrorBanner` (conditional) — red error banner with Retry
 4. `Expanded` — either `_QwertyKeyboard` or `_RemoteSections`
 
-**`Scaffold.bottomNavigationBar`: `_AppLauncherBar`**
-Pinned bar (always visible, above system nav via `SafeArea(top: false)`). Background `0xFF252538` with rounded top corners (`BorderRadius.vertical(top: Radius.circular(16))`). Three equal-width `_AppButton`s:
-- **Disney+** — searches `['disney']`
-- **YouTube** — searches `['youtube']`
-- **Amazon Prime** — searches `['amazon', 'prime']`
+No `bottomNavigationBar` — the Scaffold body fills to the bottom edge. `_RemoteSections` uses `MediaQuery.of(context).padding.bottom` to add scroll clearance for the system nav bar.
 
-Each button calls `launchStreamingApp(terms)`; shows a snackbar if no match found. Buttons dim when disconnected. All four launchers (Settings + 3 app buttons) share `_cachedApps`.
-
-**`_RemoteSections`** — four collapsible sections:
+**`_RemoteSections`** — five collapsible sections:
 - Volume & Channel (collapsed by default) — VOL+/−, MUTE, CH+/−
 - Navigation (expanded) — D-pad + OK + BACK + HOME
 - Playback (collapsed) — REWIND, PLAY, PAUSE, FASTFORWARD
 - Keypad (collapsed) — 0–9
+- Apps (collapsed) — four equal-width `_AppButton`s: Disney+ `['disney']`, YouTube `['youtube']`, Amazon Prime `['amazon', 'prime']`, Netflix `['netflix']`. Each calls `launchStreamingApp(terms)`; shows a snackbar if no match found. Buttons dim when disconnected. All five launchers (Settings + 4 app buttons) share `_cachedApps`.
 
 **`_QwertyKeyboard`** — swaps entire body, sends via `insertText`, backspace via `deleteChar`
 
