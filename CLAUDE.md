@@ -71,3 +71,19 @@ assets/
 - Reusable MWS splash screen widget built (dark mark, static, 3 seconds)
 - Play Store assets complete: feature graphic, descriptions, screenshots
 - Version 2.1.0+3 submitted to Play Store
+
+## Available Skills
+Skills live at github.com/MysterWolf/skills. Pull that repo and read README.md
+to see all available skills before starting work.
+
+Relevant skills for this repo:
+- edit-component — safe editing protocol, context first, invariants respected
+- update-context — update this CLAUDE.md after session, commit and push
+- audit-repo — read-only snapshot of repo state
+- update-portfolio — add or update DPad Pilot entry on mysterwolf.studio
+
+## Updated Claude Code Session Starter
+"I'm working on DPad Pilot — a Flutter LG WebOS TV remote at github.com/MysterWolf/dpad_pilot.
+First pull github.com/MysterWolf/skills and read README.md so you know what skills are available.
+Then pull this repo and read CLAUDE.md in full. Respect all invariants before making any changes.
+Confirm you understand the structure and available skills before I give you the next task."
