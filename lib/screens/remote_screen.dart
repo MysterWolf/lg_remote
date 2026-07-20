@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/tv_device.dart';
 import '../providers/remote_provider.dart';
+import '../services/overlay_bridge_service.dart';
 import '../services/ssap_service.dart';
 import '../widgets/remote_button.dart';
 import 'about_screen.dart';
@@ -21,6 +22,7 @@ class RemoteScreen extends ConsumerStatefulWidget {
 
 class _RemoteScreenState extends ConsumerState<RemoteScreen> {
   bool _showKeyboard = false;
+  bool _overlayAutoShow = true;
 
   Future<void> _handleSettings(
       BuildContext context, RemoteNotifier remote) async {
@@ -58,10 +60,91 @@ class _RemoteScreenState extends ConsumerState<RemoteScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       ref.read(remoteProvider(widget.tv.ip).notifier).connect();
     });
+
+    // Arms native onUserLeaveHint to show the floating overlay instead of
+    // backgrounding — does not touch the TV connection. Overlay button
+    // taps come back in here and are dispatched to the same notifier the
+    // full UI uses.
+    OverlayBridgeService.instance.onCommand = _handleOverlayCommand;
+    OverlayBridgeService.instance.loadAutoShowPreference().then((enabled) {
+      if (!mounted) return;
+      setState(() => _overlayAutoShow = enabled);
+      OverlayBridgeService.instance.setOverlayEnabled(enabled);
+    });
+
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      final hasPermission =
+          await OverlayBridgeService.instance.hasOverlayPermission();
+      if (!hasPermission && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text(
+                'Enable floating remote to keep controls visible over other apps'),
+            action: SnackBarAction(
+              label: 'Enable',
+              onPressed: OverlayBridgeService.instance.requestOverlayPermission,
+            ),
+            duration: const Duration(seconds: 6),
+          ),
+        );
+      }
+    });
+  }
+
+  void _handleOverlayCommand(String action) {
+    final remote = ref.read(remoteProvider(widget.tv.ip).notifier);
+    switch (action) {
+      case 'UP':
+      case 'DOWN':
+      case 'LEFT':
+      case 'RIGHT':
+      case 'ENTER':
+      case 'BACK':
+        remote.key(action);
+        break;
+      case 'VOL_UP':
+        remote.volumeUp();
+        break;
+      case 'VOL_DOWN':
+        remote.volumeDown();
+        break;
+      case 'MUTE':
+        remote.key('MUTE');
+        break;
+      case 'APP_DISNEY':
+        remote.launchStreamingApp(['disney']);
+        break;
+      case 'APP_YOUTUBE':
+        remote.launchStreamingApp(['youtube']);
+        break;
+      case 'APP_AMAZON':
+        remote.launchStreamingApp(['amazon', 'prime']);
+        break;
+      case 'APP_NETFLIX':
+        remote.launchStreamingApp(['netflix']);
+        break;
+    }
+  }
+
+  void _toggleOverlayAutoShow() {
+    final enabled = !_overlayAutoShow;
+    setState(() => _overlayAutoShow = enabled);
+    OverlayBridgeService.instance.setOverlayEnabled(enabled);
+    OverlayBridgeService.instance.setAutoShowPreference(enabled);
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(enabled
+            ? 'Floating remote will show when you leave the app'
+            : 'Floating remote disabled — the home screen widget still works independently'),
+        duration: const Duration(seconds: 2),
+      ),
+    );
   }
 
   @override
   void dispose() {
+    OverlayBridgeService.instance.onCommand = null;
+    OverlayBridgeService.instance.setOverlayEnabled(false);
     ref.read(remoteProvider(widget.tv.ip).notifier).disconnect();
     super.dispose();
   }
@@ -70,6 +153,10 @@ class _RemoteScreenState extends ConsumerState<RemoteScreen> {
   Widget build(BuildContext context) {
     final state  = ref.watch(remoteProvider(widget.tv.ip));
     final remote = ref.read(remoteProvider(widget.tv.ip).notifier);
+
+    // Fire-and-forget: keeps the overlay's status dot in sync whenever it's
+    // showing. No-op on the native side if the overlay isn't up.
+    OverlayBridgeService.instance.updateStatus(state.connectionState.name);
 
     return Scaffold(
       appBar: AppBar(
@@ -103,6 +190,8 @@ class _RemoteScreenState extends ConsumerState<RemoteScreen> {
                 setState(() => _showKeyboard = !_showKeyboard),
             onSettings: () => _handleSettings(context, remote),
             onReconnect: remote.reconnect,
+            overlayAutoShow: _overlayAutoShow,
+            onToggleOverlayAutoShow: _toggleOverlayAutoShow,
           ),
           if (state.isPairing) _PairingBanner(),
           if (state.isError) _ErrorBanner(onRetry: remote.connect),
@@ -127,6 +216,8 @@ class _PersistentTopBar extends StatelessWidget {
   final VoidCallback onToggleKeyboard;
   final VoidCallback onSettings;
   final VoidCallback onReconnect;
+  final bool overlayAutoShow;
+  final VoidCallback onToggleOverlayAutoShow;
 
   const _PersistentTopBar({
     required this.remote,
@@ -136,6 +227,8 @@ class _PersistentTopBar extends StatelessWidget {
     required this.onToggleKeyboard,
     required this.onSettings,
     required this.onReconnect,
+    required this.overlayAutoShow,
+    required this.onToggleOverlayAutoShow,
   });
 
   @override
@@ -169,6 +262,16 @@ class _PersistentTopBar extends StatelessWidget {
             child: Icon(
               showKeyboard ? Icons.tv_rounded : Icons.keyboard_alt_outlined,
               color: showKeyboard ? Colors.lightBlueAccent : Colors.white70,
+              size: 22,
+            ),
+          ),
+          RemoteButton(
+            color: const Color(0xFF2A2A4A),
+            size: 54,
+            onPressed: onToggleOverlayAutoShow,
+            child: Icon(
+              Icons.picture_in_picture_alt,
+              color: overlayAutoShow ? Colors.lightBlueAccent : Colors.white70,
               size: 22,
             ),
           ),
