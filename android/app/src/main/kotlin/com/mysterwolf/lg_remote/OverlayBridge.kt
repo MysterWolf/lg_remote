@@ -11,6 +11,9 @@ import io.flutter.plugin.common.MethodChannel
 object OverlayBridge {
     var mainChannel: MethodChannel? = null
 
+    /** True only while MainActivity's Flutter engine is actually alive and attached. */
+    fun isEngineAlive(): Boolean = mainChannel != null
+
     fun sendCommandToMain(action: String) {
         mainChannel?.invokeMethod("overlayCommand", action)
     }

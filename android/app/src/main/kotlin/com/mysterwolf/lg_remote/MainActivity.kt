@@ -20,6 +20,12 @@ class MainActivity : FlutterActivity() {
         bridgeChannel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, bridgeChannelName)
         OverlayBridge.mainChannel = bridgeChannel
 
+        // A fresh engine attach means the process just (re)started — any
+        // "connected" the widget/overlay might still be showing is leftover
+        // from before the process died. Reset to the true baseline; a real
+        // connection will push its own status once RemoteScreen connects.
+        RemoteWidgetProvider.updateStatus(this, "disconnected")
+
         bridgeChannel?.setMethodCallHandler { call, result ->
             when (call.method) {
                 "setOverlayEnabled" -> {

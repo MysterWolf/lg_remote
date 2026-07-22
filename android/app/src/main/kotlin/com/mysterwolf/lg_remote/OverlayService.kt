@@ -17,6 +17,7 @@ import android.view.Gravity
 import android.view.MotionEvent
 import android.view.View
 import android.view.WindowManager
+import android.widget.FrameLayout
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
@@ -188,13 +189,22 @@ class OverlayService : Service() {
 
         val dot = View(this).apply {
             val size = dp(10)
-            layoutParams = LinearLayout.LayoutParams(size, size).apply { marginEnd = dp(12) }
+            layoutParams = FrameLayout.LayoutParams(size, size, Gravity.CENTER)
             background = GradientDrawable().apply {
                 shape = GradientDrawable.OVAL
                 setColor(Color.parseColor("#FF5252"))
             }
         }
         statusDot = dot
+
+        // Tappable to force a reconnect — wrapped in a bigger invisible touch
+        // area since the visible dot itself is too small to reliably hit.
+        val dotTapArea = FrameLayout(this).apply {
+            layoutParams = LinearLayout.LayoutParams(dp(28), dp(28)).apply { marginEnd = dp(4) }
+            isClickable = true
+            addView(dot)
+            setOnClickListener { OverlayBridge.sendCommandToMain("RECONNECT") }
+        }
 
         val expand = ImageView(this).apply {
             setImageResource(R.drawable.ic_expand)
@@ -231,7 +241,7 @@ class OverlayService : Service() {
         }
 
         row.addView(grip)
-        row.addView(dot)
+        row.addView(dotTapArea)
         row.addView(expand)
         return row
     }

@@ -23,6 +23,7 @@ class RemoteWidgetProvider : AppWidgetProvider() {
         private var lastStatus: String? = null
 
         private val buttonActions = mapOf(
+            R.id.widget_status_dot to "RECONNECT",
             R.id.btn_back to "BACK",
             R.id.btn_up to "UP",
             R.id.btn_down to "DOWN",

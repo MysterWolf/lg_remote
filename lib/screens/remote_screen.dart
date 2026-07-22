@@ -94,6 +94,9 @@ class _RemoteScreenState extends ConsumerState<RemoteScreen> {
   void _handleOverlayCommand(String action) {
     final remote = ref.read(remoteProvider(widget.tv.ip).notifier);
     switch (action) {
+      case 'RECONNECT':
+        remote.reconnect();
+        break;
       case 'UP':
       case 'DOWN':
       case 'LEFT':
@@ -145,6 +148,9 @@ class _RemoteScreenState extends ConsumerState<RemoteScreen> {
   void dispose() {
     OverlayBridgeService.instance.onCommand = null;
     OverlayBridgeService.instance.setOverlayEnabled(false);
+    // Otherwise the overlay/widget dot freezes on whatever it last showed —
+    // there's no connection left to report on once this screen is gone.
+    OverlayBridgeService.instance.updateStatus('disconnected');
     ref.read(remoteProvider(widget.tv.ip).notifier).disconnect();
     super.dispose();
   }
