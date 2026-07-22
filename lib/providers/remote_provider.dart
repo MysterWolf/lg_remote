@@ -89,8 +89,15 @@ class RemoteNotifier extends StateNotifier<RemoteState> {
     await _svc.connect();
   }
 
-  // Navigation — always via pointer socket
-  void key(String name) => _svc.pressKey(name);
+  // Navigation — always via pointer socket. UP/DOWN/LEFT/RIGHT/ENTER/BACK/
+  // MUTE have no SSAP fallback, so a dead pointer socket needs its own
+  // repair here rather than just degrading like volume/channel do below.
+  Future<void> key(String name) async {
+    if (_svc.pressKey(name)) return;
+    if (!state.isActive) return; // fully down — normal reconnect handles it
+    await _svc.ensurePointerSocket();
+    _svc.pressKey(name);
+  }
 
   // Volume/channel: pointer socket if ready, SSAP fallback
   void volumeUp() => state.isReady

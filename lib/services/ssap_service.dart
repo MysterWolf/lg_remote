@@ -16,6 +16,7 @@ class SsapService {
   WebSocketChannel? _main;
   WebSocketChannel? _pointer;
   StreamSubscription<dynamic>? _mainSub;
+  StreamSubscription<dynamic>? _pointerSub;
 
   int _cmdId = 0;
   final _pending = <String, Completer<Map<String, dynamic>>>{};
@@ -190,12 +191,35 @@ class SsapService {
         );
         await ch.ready;
         _pointer = ch;
+        // The pointer protocol is one-way (fire-and-forget), so this stream
+        // never emits real messages — but listening is what lets onDone/
+        // onError actually surface a dead socket instead of it silently
+        // eating every keypress forever.
+        _pointerSub = ch.stream.listen(
+          (_) {},
+          onError: (_) => _onPointerDead(),
+          onDone: _onPointerDead,
+        );
         _emit(SsapStatus.ready);
         return;
       } catch (_) {}
     }
     _emit(SsapStatus.connected); // no pointer socket, limited nav
   }
+
+  void _onPointerDead() {
+    _pointerSub?.cancel();
+    _pointerSub = null;
+    _pointer = null;
+    // Main socket may still be fine — only demote, don't tear down the
+    // whole connection over a pointer-socket-only failure.
+    if (_status == SsapStatus.ready) _emit(SsapStatus.connected);
+  }
+
+  /// Best-effort reopen of just the pointer socket, e.g. after a send found
+  /// it unexpectedly gone. Never throws — same fallback behavior as the
+  /// original open path if it can't be reestablished.
+  Future<void> ensurePointerSocket() => _openPointerSocket();
 
   Future<Map<String, dynamic>> request(String uri,
       [Map<String, dynamic>? payload]) {
@@ -221,8 +245,14 @@ class SsapService {
     });
   }
 
-  void pressKey(String name) =>
-      _pointer?.sink.add('type:button\nname:$name\n\n');
+  /// Returns false when there was no live pointer socket to write to —
+  /// callers use that to trigger a reopen-and-resend instead of the
+  /// keypress silently vanishing.
+  bool pressKey(String name) {
+    if (_pointer == null) return false;
+    _pointer!.sink.add('type:button\nname:$name\n\n');
+    return true;
+  }
 
   void _sendRaw(Map<String, dynamic> msg) =>
       _main?.sink.add(jsonEncode(msg));
@@ -235,6 +265,8 @@ class SsapService {
   void disconnect() {
     _mainSub?.cancel();
     _mainSub = null;
+    _pointerSub?.cancel();
+    _pointerSub = null;
     _main?.sink.close();
     _pointer?.sink.close();
     _main = null;
